@@ -294,4 +294,4 @@ export default function HeroScene() {
   );
 }
 
-useGLTF.preload("/models/watch.glb");
+// useGLTF.preload("/models/watch.glb");

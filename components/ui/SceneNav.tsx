@@ -12,10 +12,10 @@ interface SceneDef {
 const SCENES: SceneDef[] = [
   { id: "scene-hero", label: "The Reveal", number: "01" },
   { id: "scene-explore", label: "Explore", number: "02" },
-  { id: "scene-customize", label: "Customize", number: "03" },
-  { id: "scene-own", label: "Own", number: "04" },
+  { id: "scene-movement", label: "The Movement", number: "03" },
+  { id: "scene-customize", label: "Customize", number: "04" },
+  { id: "scene-own", label: "Own", number: "05" },
 ];
-
 export default function SceneNav() {
   const [activeId, setActiveId] = useState<string>(SCENES[0].id);
   const [isVisible, setIsVisible] = useState(false);

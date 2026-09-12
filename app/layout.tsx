@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
+import LoadingScreen from "@/components/ui/LoadingScreen";
+import ModelLoader from "@/components/3d/ModelLoader";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -27,6 +29,8 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
       <body className="bg-bg-base text-text-primary font-sans antialiased">
+        <LoadingScreen />
+        <ModelLoader />
         {children}
       </body>
     </html>

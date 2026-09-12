@@ -1,5 +1,6 @@
 import HeroScene from "@/components/scenes/HeroScene";
 import ExploreScene from "@/components/scenes/ExploreScene";
+import MovementScene from "@/components/scenes/MovementScene";
 import CustomizeScene from "@/components/scenes/CustomizeScene";
 import OwnScene from "@/components/scenes/OwnScene";
 import SceneNav from "@/components/ui/SceneNav";
@@ -15,6 +16,10 @@ export default function Home() {
 
       <div id="scene-explore">
         <ExploreScene />
+      </div>
+
+      <div id="scene-movement">
+        <MovementScene />
       </div>
 
       <div id="scene-customize">
