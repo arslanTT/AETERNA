@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useEffect, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
@@ -11,6 +11,7 @@ const PALETTE = {
   steel: "#b8b8b8",
   steelBright: "#e0e0e0",
   gunmetal: "#1a1a1a",
+  gunmetalDeep: "#0f0f0f",
   ruby: "#dc2626",
 };
 
@@ -116,10 +117,6 @@ function Part({
   );
 }
 
-// =============================================================================
-// LAYOUT: 2 rows of 4 parts — clean grid
-// =============================================================================
-
 interface LayoutItem {
   kind: PartKind;
   size: number;
@@ -151,19 +148,14 @@ function buildPositions(items: LayoutItem[], rowY: number) {
   }));
 }
 
-// =============================================================================
-// MAIN COMPOSITION
-// =============================================================================
-
 function Composition() {
   const row1 = useMemo(() => buildPositions(ROW_1, 0.42), []);
   const row2 = useMemo(() => buildPositions(ROW_2, -0.42), []);
 
   return (
     <group>
-      {/* Backdrop plate — flat disc facing camera, centered */}
       <mesh position={[0, 0, -0.6]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[1.6, 1.6, 0.04, 96]} />
+        <cylinderGeometry args={[1.25, 1.25, 0.04, 96]} />
         <meshStandardMaterial
           color="#0d0d0d"
           metalness={0.85}
@@ -172,9 +164,8 @@ function Composition() {
         />
       </mesh>
 
-      {/* Gold ring around the plate — thin, subtle */}
       <mesh position={[0, 0, -0.56]}>
-        <torusGeometry args={[1.6, 0.006, 10, 128]} />
+        <torusGeometry args={[1.25, 0.006, 10, 128]} />
         <meshStandardMaterial
           color={PALETTE.goldDeep}
           metalness={1}
@@ -183,7 +174,6 @@ function Composition() {
         />
       </mesh>
 
-      {/* Inner gold ring */}
       <mesh position={[0, 0, -0.55]}>
         <torusGeometry args={[1.12, 0.004, 10, 128]} />
         <meshStandardMaterial
@@ -194,7 +184,6 @@ function Composition() {
         />
       </mesh>
 
-      {/* Row 1 parts */}
       {row1.map((p, i) => (
         <Part
           key={`r1-${i}`}
@@ -207,7 +196,6 @@ function Composition() {
         />
       ))}
 
-      {/* Row 2 parts */}
       {row2.map((p, i) => (
         <Part
           key={`r2-${i}`}
@@ -223,10 +211,6 @@ function Composition() {
   );
 }
 
-// =============================================================================
-// MAIN EXPORT
-// =============================================================================
-
 interface MechanicalMovementProps {
   revealProgress: number;
 }
@@ -235,11 +219,23 @@ export default function MechanicalMovement({
   revealProgress,
 }: MechanicalMovementProps) {
   const groupRef = useRef<THREE.Group>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile viewport
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useFrame(() => {
     if (!groupRef.current) return;
     const s = Number.isFinite(revealProgress) ? revealProgress : 1;
-    groupRef.current.scale.setScalar(0.8 + s * 0.2);
+    // Shrink the composition on mobile so it fits the narrow viewport
+    const baseScale = isMobile ? 0.55 : 1;
+    const scale = baseScale * (0.8 + s * 0.2);
+    groupRef.current.scale.setScalar(scale);
     groupRef.current.visible = s > 0.01;
   });
 

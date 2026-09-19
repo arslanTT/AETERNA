@@ -60,6 +60,7 @@ export default function ExplodableWatch({
   const partsRef = useRef<Map<string, PartEntry>>(new Map());
   const autoRotateRef = useRef(0);
   const isDraggingRef = useRef(false);
+  const didDragRef = useRef(false);
   const lastPointerRef = useRef({ x: 0, y: 0 });
   const dragVelocityRef = useRef(0);
 
@@ -157,6 +158,7 @@ export default function ExplodableWatch({
       // Only enable drag when in interactive exploded mode
       if (!isInteractiveRef.current) return;
       isDraggingRef.current = true;
+      didDragRef.current = false; // reset on every new pointer down
       lastPointerRef.current = { x: e.clientX, y: e.clientY };
       dragVelocityRef.current = 0;
       domElement.style.cursor = "grabbing";
@@ -167,6 +169,11 @@ export default function ExplodableWatch({
 
       const dx = e.clientX - lastPointerRef.current.x;
       const dy = e.clientY - lastPointerRef.current.y;
+
+      // If the pointer has moved more than a few pixels, it's a drag, not a click
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        didDragRef.current = true;
+      }
 
       const rotY = dx * 0.008;
       const rotX = dy * 0.008;
@@ -185,6 +192,9 @@ export default function ExplodableWatch({
     const onPointerUp = () => {
       isDraggingRef.current = false;
       domElement.style.cursor = "auto";
+      // didDragRef is NOT reset here — it stays true until the next
+      // pointer down. This lets Three.js's onClick check whether the
+      // gesture that just ended was a click or a drag.
     };
 
     domElement.addEventListener("pointerdown", onPointerDown);
@@ -224,7 +234,8 @@ export default function ExplodableWatch({
       // Gate interaction: only when fully snapped open
       if (!isInteractiveRef.current) return;
       e.stopPropagation();
-      if (isDraggingRef.current) return;
+      // Only reject the click if the user actually dragged
+      if (didDragRef.current) return;
       const partId = e.object.userData.partId as string | undefined;
       if (partId) {
         setSelectedPart(partId);
@@ -252,21 +263,17 @@ export default function ExplodableWatch({
     }
 
     // --- 2. Snap behavior ---
-    // Determine target snap state based on scroll threshold
     const aboveThreshold = progress >= SNAP_THRESHOLD;
     const belowReassemble = progress < REASSEMBLE_START;
     const shouldBeInteractive = aboveThreshold && belowReassemble;
 
-    // Smooth snap progress
     const snapTarget = shouldBeInteractive ? 1 : 0;
     snapProgressRef.current +=
       (snapTarget - snapProgressRef.current) * Math.min(delta * 4, 1);
 
-    // Consider "interactive" once snap is > 0.9
     const wasInteractive = isInteractiveRef.current;
     isInteractiveRef.current = snapProgressRef.current > 0.9;
 
-    // If we just left interactive mode, clear selection
     if (wasInteractive && !isInteractiveRef.current) {
       if (useWatchStore.getState().selectedPartId) {
         clearSelection();
@@ -274,7 +281,6 @@ export default function ExplodableWatch({
     }
 
     // --- 3. Final explosion = max of scroll-driven and snap-driven ---
-    // When snapped in, force full explosion; otherwise follow scroll
     const explosionProgress = Math.max(
       scrollExplosion,
       snapProgressRef.current * (aboveThreshold && belowReassemble ? 1 : 0),

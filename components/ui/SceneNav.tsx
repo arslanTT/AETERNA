@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { useWatchStore } from "@/store/watch-store";
 
 interface SceneDef {
   id: string;
@@ -16,10 +17,15 @@ const SCENES: SceneDef[] = [
   { id: "scene-customize", label: "Customize", number: "04" },
   { id: "scene-own", label: "Own", number: "05" },
 ];
+
 export default function SceneNav() {
   const [activeId, setActiveId] = useState<string>(SCENES[0].id);
   const [isVisible, setIsVisible] = useState(false);
   const tickingRef = useRef(false);
+
+  // Hide the nav when a part is selected in Scene 2
+  const selectedPartId = useWatchStore((s) => s.selectedPartId);
+  const shouldHide = selectedPartId !== null;
 
   // Detect which scene contains the viewport center
   useEffect(() => {
@@ -27,20 +33,15 @@ export default function SceneNav() {
       const viewportCenter = window.innerHeight / 2;
 
       let currentId = SCENES[0].id;
-      // Iterate scenes and pick the last one whose top is above the center
       for (const scene of SCENES) {
         const el = document.getElementById(scene.id);
         if (!el) continue;
         const rect = el.getBoundingClientRect();
-        // If the viewport center is within [rect.top, rect.bottom]
         if (rect.top <= viewportCenter && rect.bottom > viewportCenter) {
           currentId = scene.id;
           break;
         }
-        // Fallback: if scene top has passed viewport center but bottom hasn't yet,
-        // treat it as active (handles edge cases when scrolling fast)
         if (rect.top > viewportCenter) {
-          // The first scene whose top is below the center: previous scene is active
           break;
         }
         currentId = scene.id;
@@ -80,14 +81,18 @@ export default function SceneNav() {
     el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
+  const show = isVisible && !shouldHide;
+
   return (
     <nav
       aria-label="Scene navigation"
       className={cn(
         "fixed right-6 top-1/2 -translate-y-1/2 z-40",
         "hidden md:flex flex-col items-end gap-5",
-        "transition-opacity duration-700 ease-out",
-        isVisible ? "opacity-100" : "opacity-0 pointer-events-none",
+        "transition-all duration-500 ease-out",
+        show
+          ? "opacity-100 translate-x-0"
+          : "opacity-0 translate-x-4 pointer-events-none",
       )}
     >
       {SCENES.map((scene) => {

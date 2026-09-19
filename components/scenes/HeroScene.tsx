@@ -1,5 +1,5 @@
 "use client";
-// Add imports at top:
+
 import SceneLights from "@/components/3d/SceneLights";
 import SceneBackdrop from "@/components/3d/SceneBackdrop";
 
@@ -18,7 +18,6 @@ import gsap from "gsap";
 import HeroOverlay from "@/components/ui/HeroOverlay";
 import { cloneWatchScene } from "@/lib/cloneWatchScene";
 
-// Large initial separation offsets for a dramatic "paused explosion" effect
 const INITIAL_OFFSETS: Record<string, [number, number, number]> = {
   FinalStrap1: [0, -1.5, -1.5],
   FinalStrap2: [0, -1.5, 1.5],
@@ -50,7 +49,10 @@ function WatchModel({
   const rotationStartTimeRef = useRef(0);
   const assemblyTimelineRef = useRef<gsap.core.Timeline | null>(null);
 
-  const clonedScene = useMemo(() => {
+  // Clone the scene, enhance materials, and BUILD THE PARTS MAP —
+  // all in one memo. Return both the scene AND the parts, so the effect
+  // never has to re-derive positions from the scene.
+  const { clonedScene, parts } = useMemo(() => {
     const clone = cloneWatchScene(scene);
 
     clone.traverse((child) => {
@@ -77,36 +79,51 @@ function WatchModel({
       });
     });
 
-    return clone;
-  }, [scene]);
-
-  useEffect(() => {
-    const parts = new Map<string, WatchPart>();
+    // Build parts + set separated positions, all synchronously
+    const partsMap = new Map<string, WatchPart>();
 
     PART_NAMES.forEach((partName) => {
-      const object = clonedScene.getObjectByName(partName);
-      if (object) {
-        const originalPosition = object.position.clone();
-        const offset = INITIAL_OFFSETS[partName] || [0, 0, 0];
-        const separatedPosition = new THREE.Vector3(
-          originalPosition.x + offset[0],
-          originalPosition.y + offset[1],
-          originalPosition.z + offset[2],
-        );
-        object.position.copy(separatedPosition);
-
-        parts.set(partName, {
-          name: partName,
-          object,
-          originalPosition,
-          separatedPosition,
-        });
-      } else {
+      const object = clone.getObjectByName(partName);
+      if (!object) {
         console.warn(`Part "${partName}" not found in watch model`);
+        return;
       }
+
+      // CRITICAL: capture the ORIGINAL position FIRST,
+      // before we mutate the object's position.
+      const originalPosition = object.position.clone();
+      const offset = INITIAL_OFFSETS[partName] || [0, 0, 0];
+      const separatedPosition = new THREE.Vector3(
+        originalPosition.x + offset[0],
+        originalPosition.y + offset[1],
+        originalPosition.z + offset[2],
+      );
+
+      // Now move the object to separated position
+      object.position.copy(separatedPosition);
+
+      partsMap.set(partName, {
+        name: partName,
+        object,
+        originalPosition,
+        separatedPosition,
+      });
     });
 
-    // Start assembly animation after 1.5 seconds
+    return { clonedScene: clone, parts: partsMap };
+  }, [scene]);
+
+  // Assembly animation — uses the parts map from the memo.
+  // The effect does NOT re-derive positions, so it's StrictMode-safe.
+  useEffect(() => {
+    if (parts.size === 0) return;
+
+    // Reset to separated position on every effect run,
+    // in case StrictMode's cleanup previously reset them.
+    parts.forEach((part) => {
+      part.object.position.copy(part.separatedPosition);
+    });
+
     const delayedCall = gsap.delayedCall(1.5, () => {
       const assemblyTimeline = gsap.timeline({
         onComplete: () => {
@@ -140,12 +157,8 @@ function WatchModel({
         assemblyTimelineRef.current = null;
       }
       isRotatingRef.current = false;
-      parts.forEach((part) => {
-        part.object.position.copy(part.originalPosition);
-      });
-      parts.clear();
     };
-  }, [clonedScene, onAnimationComplete]);
+  }, [parts, onAnimationComplete]);
 
   useFrame((state, delta) => {
     if (!isRotatingRef.current || !groupRef.current) return;
@@ -180,7 +193,6 @@ export default function HeroScene() {
     setIsAssemblyComplete(true);
   }, []);
 
-  // Text animations after assembly completes
   useEffect(() => {
     if (!isAssemblyComplete) return;
 
@@ -215,7 +227,6 @@ export default function HeroScene() {
     };
   }, [isAssemblyComplete]);
 
-  // Hide text + scroll indicator when HeroScene starts leaving the viewport
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -253,7 +264,6 @@ export default function HeroScene() {
     return () => observer.disconnect();
   }, [isAssemblyComplete]);
 
-  // In JSX — replace the outer section content:
   return (
     <section
       ref={containerRef}
@@ -293,5 +303,3 @@ export default function HeroScene() {
     </section>
   );
 }
-
-// useGLTF.preload("/models/watch.glb");
